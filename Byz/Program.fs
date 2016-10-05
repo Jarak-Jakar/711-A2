@@ -34,8 +34,10 @@ type TopDownMessage(id, messVal, subArraySize) =
 type General(id, initVal, isFaulty, numGenerals, ?someMessages) = 
     let messages = 
         match someMessages with
-        | Some (x : String[]) -> Array2D.init (x.Length / numGenerals) numGenerals (fun y z -> x.[numGenerals * y + z])
-        | None -> Array2D.zeroCreate 1 1
+        (*| Some (x : String[]) -> Array2D.init (x.Length / numGenerals) numGenerals (fun y z -> x.[numGenerals * y + z])
+        | None -> Array2D.zeroCreate 1 1*)
+        | Some (x : String[]) -> Array.init 2 (fun y -> String.concat " " x.[(y * numGenerals)..(y * numGenerals + numGenerals - 1)])
+        | None -> Array.empty
 
     let lambda = TopDownMessage("lambda", initVal, numGenerals)
 
@@ -88,7 +90,7 @@ let main argv =
 
     Array.sortInPlaceBy (fun (x : General) -> x.ID) genArray
 
-    genArray.[0].Post(TopDownMessage("1", "0", 1))
+    //genArray.[0].Post(TopDownMessage("1", "0", 1))
 
     //let mbg = new MailboxProcessor<TopDownMessage>(mailboxGeneral)
     (*let general = new MailboxProcessor<TopDownMessage>(fun inbox ->
