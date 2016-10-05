@@ -8,21 +8,25 @@ open FSharp.Control
 type TopDownMessage(id, messVal, subArraySize) = 
     //let potato = 1
 
-    let childMessages = Array.create subArraySize (TopDownMessage("blank", "-1", subArraySize - 1))
+    //let childMessages = Array.create subArraySize (TopDownMessage("blank", "-1", subArraySize - 1))
 
     let messageSent = false
 
-    //[<DefaultValue>]
-    //val mutable private ChildMessages:Message
+    [<DefaultValue>]
+    val mutable private ChildMessages : TopDownMessage[]
 
     member x.AttachMessage (incmess : TopDownMessage) = 
+
+        if isNull x.ChildMessages && subArraySize > 0 then
+            x.ChildMessages <- Array.create subArraySize (TopDownMessage("blank", "-1", subArraySize - 1))
+
         let firstidwidth = incmess.ID.IndexOf(".")
         if firstidwidth > -1 then
             let subid = Int32.Parse (incmess.ID.Substring(0, firstidwidth))
-            childMessages.[subid].AttachMessage (TopDownMessage(incmess.ID.Substring(subid + 1), messVal, subArraySize - 1))
+            x.ChildMessages.[subid].AttachMessage (TopDownMessage(incmess.ID.Substring(subid + 1), messVal, subArraySize - 1))
         else
             let subid = Int32.Parse incmess.ID
-            childMessages.[subid] <- TopDownMessage(incmess.ID, messVal, subArraySize - 1)
+            x.ChildMessages.[subid] <- TopDownMessage(incmess.ID, messVal, subArraySize - 1)
 
     member x.ID : String = 
         id
@@ -30,10 +34,20 @@ type TopDownMessage(id, messVal, subArraySize) =
 type General(id, initVal, isFaulty, numGenerals, ?someMessages) = 
     let messages = 
         match someMessages with
-        | Some x -> x
-        | None -> Array.empty<String>
+        | Some (x : String[]) -> Array2D.init (x.Length / numGenerals) numGenerals (fun y z -> x.[numGenerals * y + z])
+        | None -> Array2D.zeroCreate 1 1
 
     let lambda = TopDownMessage("lambda", initVal, numGenerals)
+
+    let mb = 
+        MailboxProcessor.Start (fun inbox ->
+            let rec loop count = 
+                async { let! (msg : TopDownMessage) = inbox.Receive()
+                        printfn "Message is %A" msg.ID
+                        return! loop 0}
+            loop 0)
+
+    member x.Post(msg) = mb.Post(msg)
 
     member x.IsFaulty =
         isFaulty = "1"
@@ -47,13 +61,13 @@ type General(id, initVal, isFaulty, numGenerals, ?someMessages) =
     | BUMess of BottomUpMessage*)
 
 
-let mailboxGeneral (inbox : MailboxProcessor<TopDownMessage>, thisGeneral : General) = 
-    let general = General("8", "9", "1", 6)
+(*let mailboxGeneral (inbox : MailboxProcessor<TopDownMessage>, thisGeneral : General) = 
+    //let general = thisGeneral
     let rec loop count = 
         async { let! msg = inbox.Receive()
                 printfn "Message is %A" msg.ID
                 return! loop 0}
-    loop 0
+    loop 0*)
 
 [<EntryPoint>]
 let main argv = 
@@ -73,6 +87,8 @@ let main argv =
             genArray.[i] <- General(linePieces.[0], linePieces.[1], linePieces.[2], numNodes)
 
     Array.sortInPlaceBy (fun (x : General) -> x.ID) genArray
+
+    genArray.[0].Post(TopDownMessage("1", "0", 1))
 
     //let mbg = new MailboxProcessor<TopDownMessage>(mailboxGeneral)
     (*let general = new MailboxProcessor<TopDownMessage>(fun inbox ->
