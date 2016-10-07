@@ -5,6 +5,13 @@ open System
 open System.IO
 open FSharp.Control
 
+let factorial n = 
+    let rec loop i acc = 
+        match i with
+        | 0 | 1 -> acc
+        | _ -> loop (i - 1) (acc * i)
+    loop n 1
+
 type TopDownMessage(id, messVal, subArraySize) = 
     //let potato = 1
 
@@ -31,15 +38,17 @@ type TopDownMessage(id, messVal, subArraySize) =
     member x.ID : String = 
         id
 
-type General(id, initVal, isFaulty, numGenerals, ?someMessages) = 
+type General(id, initVal, isFaulty, numGenerals, numRounds, ?someMessages) = 
     let messages = 
         match someMessages with
         (*| Some (x : String[]) -> Array2D.init (x.Length / numGenerals) numGenerals (fun y z -> x.[numGenerals * y + z])
         | None -> Array2D.zeroCreate 1 1*)
-        | Some (x : String[]) -> Array.init 2 (fun y -> String.concat " " x.[(y * numGenerals)..(y * numGenerals + numGenerals - 1)])
+        | Some (x : String[]) -> Array.init numRounds (fun y -> String.concat " " x.[(y * numGenerals)..(y * numGenerals + numGenerals - 1)])
         | None -> Array.empty
 
     let lambda = TopDownMessage("lambda", initVal, numGenerals)
+
+    let bigArray = Array2D.init numGenerals numRounds (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - y)) 0))
 
     let mb = 
         MailboxProcessor.Start (fun inbox ->
@@ -79,14 +88,15 @@ let main argv =
     let mutable linePieces = fileLine.Split()
     let numNodes = Int32.Parse linePieces.[0]
     let v0 = linePieces.[1]
-    let genArray = Array.create numNodes (General("8", "9", "1", 6))
+    let genArray = Array.create numNodes (General("8", "9", "1", 6, 1))
+    let numRounds = int (Math.Ceiling((float numNodes) / 3.0))
     for i = 0 to numNodes - 1 do
         fileLine <- reader.ReadLine()
         linePieces <- fileLine.Split()
         if linePieces.[2] = "1" then
-            genArray.[i] <- General(linePieces.[0], linePieces.[1], linePieces.[2], numNodes, linePieces.[3..])
+            genArray.[i] <- General(linePieces.[0], linePieces.[1], linePieces.[2], numNodes, numRounds, linePieces.[3..])
         else
-            genArray.[i] <- General(linePieces.[0], linePieces.[1], linePieces.[2], numNodes)
+            genArray.[i] <- General(linePieces.[0], linePieces.[1], linePieces.[2], numNodes, numRounds)
 
     Array.sortInPlaceBy (fun (x : General) -> x.ID) genArray
 
