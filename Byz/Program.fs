@@ -12,14 +12,14 @@ let factorial n =
         | _ -> loop (i - 1) (acc * i)
     loop n 1
 
-type TopDownMessage(id, messVal, subArraySize) = 
+type TopDownMessage(generalID, message : string, roundNumber) = 
     //let potato = 1
 
     //let childMessages = Array.create subArraySize (TopDownMessage("blank", "-1", subArraySize - 1))
 
     let messageSent = false
 
-    [<DefaultValue>]
+    (*[<DefaultValue>]
     val mutable private ChildMessages : TopDownMessage[]
 
     member x.AttachMessage (incmess : TopDownMessage) = 
@@ -33,12 +33,31 @@ type TopDownMessage(id, messVal, subArraySize) =
             x.ChildMessages.[subid].AttachMessage (TopDownMessage(incmess.ID.Substring(subid + 1), messVal, subArraySize - 1))
         else
             let subid = Int32.Parse incmess.ID
-            x.ChildMessages.[subid] <- TopDownMessage(incmess.ID, messVal, subArraySize - 1)
+            x.ChildMessages.[subid] <- TopDownMessage(incmess.ID, messVal, subArraySize - 1)*)
 
     member x.ID : String = 
-        id
+        generalID
 
-type General(id, initVal, isFaulty, numGenerals, numRounds, ?someMessages) = 
+    member x.Message = 
+        message
+
+    member x.RoundNumber = 
+        roundNumber
+
+type BottomUpMessage = 
+    val id : int
+
+type StepMessage(nextRound) = 
+    
+    member x.roundNumber = 
+        nextRound
+
+type Message =
+    | TDMess of TopDownMessage
+    | SMess of StepMessage
+    | BUMess of BottomUpMessage
+
+type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) = 
     let messages = 
         match someMessages with
         (*| Some (x : String[]) -> Array2D.init (x.Length / numGenerals) numGenerals (fun y z -> x.[numGenerals * y + z])
@@ -46,15 +65,24 @@ type General(id, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
         | Some (x : String[]) -> Array.init numRounds (fun y -> String.concat " " x.[(y * numGenerals)..(y * numGenerals + numGenerals - 1)])
         | None -> Array.empty
 
-    let lambda = TopDownMessage("lambda", initVal, numGenerals)
+    //let lambda = TopDownMessage("lambda", initVal, numGenerals)
 
-    let bigArray = Array2D.init numGenerals numRounds (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - y)) 0))
+    let genArray = Array.create numGenerals (Array2D.init numRounds numGenerals (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - x)) (Int32.Parse initVal))))
+
+    //let bigArray = Array2D.init numRounds numGenerals (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - x)) 0))
 
     let mb = 
         MailboxProcessor.Start (fun inbox ->
             let rec loop count = 
-                async { let! (msg : TopDownMessage) = inbox.Receive()
-                        printfn "Message is %A" msg.ID
+                async { let! (msg : Message) = inbox.Receive()
+                        match msg with
+                        | TDMess mesg -> 
+                            printfn "Message is %A" mesg.ID
+                            let sender = (Int32.Parse mesg.ID) - 1
+                            let rn = mesg.RoundNumber - 1
+                            let messagePieces = mesg.Message.Split
+                            genArray.[sender].[rn,0].[0] <- 2
+                        | _ -> printfn "Matched something other than a TopDownMessage"
                         return! loop 0}
             loop 0)
 
@@ -65,12 +93,6 @@ type General(id, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
 
     member x.ID = 
         id
-
-(*type Message =
-    | TDMess of TopDownMessage
-    | SMess of StepMessage
-    | BUMess of BottomUpMessage*)
-
 
 (*let mailboxGeneral (inbox : MailboxProcessor<TopDownMessage>, thisGeneral : General) = 
     //let general = thisGeneral
@@ -88,15 +110,15 @@ let main argv =
     let mutable linePieces = fileLine.Split()
     let numNodes = Int32.Parse linePieces.[0]
     let v0 = linePieces.[1]
-    let genArray = Array.create numNodes (General("8", "9", "1", 6, 1))
+    let genArray = Array.create numNodes (General("8", v0, "9", "1", 7, 3))
     let numRounds = int (Math.Ceiling((float numNodes) / 3.0))
     for i = 0 to numNodes - 1 do
         fileLine <- reader.ReadLine()
         linePieces <- fileLine.Split()
         if linePieces.[2] = "1" then
-            genArray.[i] <- General(linePieces.[0], linePieces.[1], linePieces.[2], numNodes, numRounds, linePieces.[3..])
+            genArray.[i] <- General(linePieces.[0], v0, linePieces.[1], linePieces.[2], numNodes, numRounds, linePieces.[3..])
         else
-            genArray.[i] <- General(linePieces.[0], linePieces.[1], linePieces.[2], numNodes, numRounds)
+            genArray.[i] <- General(linePieces.[0], v0, linePieces.[1], linePieces.[2], numNodes, numRounds)
 
     Array.sortInPlaceBy (fun (x : General) -> x.ID) genArray
 
