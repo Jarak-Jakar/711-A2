@@ -88,9 +88,9 @@ type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
                             for i = 0 to mesg.Message.Length - 1 do
                                 let mutable index = 0
                                 if i < sender then
-                                    index <- (i * msgSize) + sender - 1
+                                    index <- (i * msgSize * rn) + sender - rn
                                 else
-                                    index <- ((i + 1) * msgSize) + sender
+                                    index <- ((i + 1) * msgSize * rn) + sender
                                 let x = mesg.Message.[i]
                                 if x = '0' || x = '1' then
                                     //genArray.[rn,i].[sender] <- mesg.Message.[i].ToString()
@@ -99,8 +99,8 @@ type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
                                     genArray.[rn].[index] <- v0
 
                             printfn "genArray = %A" genArray
-                            printfn "hi bill"
-                            if count >= 3 then
+                            //printfn "hi bill"
+                            if count >= 7 then
                                 tcs.SetResult(true)
                             //System.Threading.Thread.Sleep(5000)
                                 //genArray.[rn,i].[sender] <- Int32.Parse mesg.Message[i]
@@ -143,6 +143,15 @@ let main argv =
             genArray.[i] <- General(linePieces.[0], v0, linePieces.[1], linePieces.[2], numNodes, numRounds)
 
     Array.sortInPlaceBy (fun (x : General) -> x.ID) genArray
+
+    let bill = (TDMess(TopDownMessage("1", "1", 1)))
+    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("2", "1", 1)))
+    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("3", "1", 1)))
+    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("4", "1", 1)))
+    genArray.[0].Post(bill)
 
     let bill = (TDMess(TopDownMessage("1", "111", 2)))
    // let ben = 
