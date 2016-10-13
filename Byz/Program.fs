@@ -74,6 +74,18 @@ type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
 
     //let bigArray = Array2D.init numRounds numGenerals (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - x)) 0))
 
+    let rec compindex roundNumber numGenerals sender messageSize i genless  = 
+        if roundNumber = 0 then
+            sender
+        else 
+            let a = ((i * genless) / messageSize)
+            if a < sender then
+                let b = a * messageSize
+                b + (compindex (roundNumber - 1) (numGenerals - 1) (sender - 1) messageSize i (genless - 1))
+            else
+                let b = (a + 1) * messageSize
+                b + (compindex (roundNumber - 1) (numGenerals - 1) sender (messageSize / numGenerals) i (genless - 1))
+
     let mb = 
         MailboxProcessor.Start (fun inbox ->
             let rec loop count = 
@@ -84,17 +96,19 @@ type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
                             let sender = (Int32.Parse mesg.ID) - 1
                             let rn = mesg.RoundNumber - 1
                             let msgSize = (factorial numGenerals) / (numGenerals * (factorial (numGenerals - rn - 1)))
+                            let mutable index = 0
                             //let messagePieces = mesg.Message.Split
                             for i = 0 to mesg.Message.Length - 1 do
-                                let mutable index = 0
-                                if (i / (numGenerals - rn)) < sender then
+                                //let mutable index = 0
+                                (*if (i / (numGenerals - rn)) < sender then
                                     //index <- (i * msgSize * rn) + sender - rn
                                     index <- (i * msgSize) + sender - rn
                                     //index <- (i * (numGenerals - rn) * rn) + sender - rn
                                 else
                                     //index <- ((i + 1) * msgSize * rn) + sender
                                     index <- ((i + 1) * msgSize) + sender
-                                    //index <- ((i + 1) * (numGenerals - rn) * rn) + sender
+                                    //index <- ((i + 1) * (numGenerals - rn) * rn) + sender*)
+                                index <- compindex rn (numGenerals - 1) sender msgSize i (numGenerals - 1)
                                 let x = mesg.Message.[i]
                                 if x = '0' || x = '1' then
                                     //genArray.[rn,i].[sender] <- mesg.Message.[i].ToString()
@@ -182,13 +196,13 @@ let main argv =
         let bill = (TDMess(TopDownMessage(i.ToString(), "111111111111", 3)))
         genArray.[0].Post(bill)*)
 
-    for i = 1 to numNodes do
+    (*for i = 1 to numNodes do
         let bill = (TDMess(TopDownMessage(i.ToString(), "1", 1)))
         genArray.[0].Post(bill)
 
     for i = 1 to numNodes do
         let bill = (TDMess(TopDownMessage(i.ToString(), "111111", 2)))
-        genArray.[0].Post(bill)
+        genArray.[0].Post(bill)*)
 
     for i = 1 to numNodes do
         let bill = (TDMess(TopDownMessage(i.ToString(), "111111111111111111111111111111", 3)))
