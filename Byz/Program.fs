@@ -7,6 +7,8 @@ open FSharp.Control
 
 let tcs = new System.Threading.Tasks.TaskCompletionSource<bool>()
 
+let bar = new System.Threading.Barrier(1)
+
 let factorial n = 
     let rec loop i acc = 
         match i with
@@ -65,17 +67,11 @@ and  Message =
 and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) = 
     let messages = 
         match someMessages with
-        (*| Some (x : String[]) -> Array2D.init (x.Length / numGenerals) numGenerals (fun y z -> x.[numGenerals * y + z])
-        | None -> Array2D.zeroCreate 1 1*)
         | Some (x : String[]) -> Array.init numRounds (fun y -> String.concat " " x.[(y * numGenerals)..(y * numGenerals + numGenerals - 1)])
         | None -> Array.empty
 
-    //let lambda = TopDownMessage("lambda", initVal, numGenerals)
-
     //let genArray = Array2D.init numRounds numGenerals (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - x)) (initVal)))
     let messagesArray = Array.init numRounds (fun x -> (Array.create (factorial numGenerals / factorial (numGenerals - x - 1)) (initVal)))
-
-    //let bigArray = Array2D.init numRounds numGenerals (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - x)) 0))
 
     let rec compindex roundNumber numGenerals sender messageSize i genless  = 
         if roundNumber = 0 then
@@ -101,6 +97,7 @@ and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
                             let msgSize = (factorial numGenerals) / (numGenerals * (factorial (numGenerals - rn - 1)))
                             let mutable index = 0
                             //let messagePieces = mesg.Message.Split
+                            Console.WriteLine("General {0} received message from {1} for round {2}.  Message is: {3}", id, mesg.ID, mesg.RoundNumber, mesg.Message)
                             for i = 0 to mesg.Message.Length - 1 do
                                 //let mutable index = 0
                                 (*if (i / (numGenerals - rn)) < sender then
@@ -114,23 +111,42 @@ and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
                                 index <- compindex rn (numGenerals - 1) sender msgSize i (numGenerals - 1)
                                 let x = mesg.Message.[i]
                                 if x = '0' || x = '1' then
-                                    //genArray.[rn,i].[sender] <- mesg.Message.[i].ToString()
                                     messagesArray.[rn].[index] <- mesg.Message.[i].ToString()
                                 else
                                     messagesArray.[rn].[index] <- v0
 
                             //printfn "genArray = %A" messagesArray
                             //printfn "hi bill"
-                            if count >= 7 then
-                                tcs.SetResult(true)
-                            //System.Threading.Thread.Sleep(5000)
+                            if count >= (numGenerals - 1) then
+                                //tcs.SetResult(true)
+                                //bar.SignalAndWait()
+                                bar.SignalAndWait()
+                                //return! loop 0
                                 //genArray.[rn,i].[sender] <- Int32.Parse mesg.Message[i]
                         | SMess mesg ->
-                            if mesg.RoundNumber = 1 then
-                                //mesg.GenArray.[0].Post(TDMess(TopDownMessage(id, v0, 1)))
-                                Array.iter (fun x -> x.Post(TDMess(TopDownMessage(id, v0, 1)))) mesg.GenArray
+                            if isFaulty = "0" then
+                                let mutable sendMessage = initVal
+
+                                // Work out sendMessage here
+                                if mesg.RoundNumber > 1 then
+                                    sendMessage <- "111"
+
+                                //if mesg.RoundNumber = 1 then
+                                Array.iter (fun (x : General) -> x.Post(TDMess(TopDownMessage(id, sendMessage, mesg.RoundNumber)))) mesg.GenArray
+                                //else
+                                    //Array.iter (fun (x : General) -> x.Post(TDMess(TopDownMessage(id, "0", mesg.RoundNumber)))) mesg.GenArray
+
+                                Console.WriteLine("{0} {1} > {2}", mesg.RoundNumber, id, (String.concat " " (Array.create numGenerals sendMessage)))
+
                             else
-                                Array.iter (fun x -> x.Post(TDMess(TopDownMessage(id, "0", mesg.RoundNumber)))) mesg.GenArray
+                                let sendMessage = messages.[mesg.RoundNumber - 1].Split ' '
+                                Array.iteri (fun i (x : General) -> x.Post(TDMess(TopDownMessage(id, sendMessage.[i], mesg.RoundNumber)))) mesg.GenArray
+                                
+                                Console.WriteLine("{0} {1} > {2}", mesg.RoundNumber, id, messages.[mesg.RoundNumber - 1])
+
+                            //tcs.SetResult(true)
+
+                            return! loop 0
                         | _ -> printfn "Matched something other than a TopDownMessage"
                         return! loop (count + 1)}
             loop 0)
@@ -170,28 +186,37 @@ let main argv =
         else
             genArray.[i] <- General(linePieces.[0], v0, linePieces.[1], linePieces.[2], numNodes, numRounds)
         //genArray.[i] <- General(i.ToString(), v0, "0", "0", numNodes, numRounds)
+        bar.AddParticipant() |> ignore
 
     Array.sortInPlaceBy (fun (x : General) -> x.ID) genArray
 
-    let bill = (TDMess(TopDownMessage("1", "1", 1)))
-    genArray.[0].Post(bill)
-    let bill = (TDMess(TopDownMessage("2", "1", 1)))
-    genArray.[0].Post(bill)
-    let bill = (TDMess(TopDownMessage("3", "1", 1)))
-    genArray.[0].Post(bill)
-    let bill = (TDMess(TopDownMessage("4", "1", 1)))
-    genArray.[0].Post(bill)
+    for i = 1 to numRounds do
+        Array.iter (fun (x : General) -> x.Post(SMess(StepMessage(i, genArray)))) genArray
+        bar.SignalAndWait()
 
-    let bill = (TDMess(TopDownMessage("1", "111", 2)))
-   // let ben = 
-    
-    genArray.[0].Post(bill)
-    let bill = (TDMess(TopDownMessage("2", "111", 2)))
-    genArray.[0].Post(bill)
-    let bill = (TDMess(TopDownMessage("3", "111", 2)))
-    genArray.[0].Post(bill)
-    let bill = (TDMess(TopDownMessage("4", "111", 2)))
-    genArray.[0].Post(bill)
+    //let bill = (TDMess(TopDownMessage("1", "1", 1)))
+    //genArray.[0].Post(bill)
+//    let bill = (TDMess(TopDownMessage("2", "1", 1)))
+//    genArray.[0].Post(bill)
+//    let bill = (TDMess(TopDownMessage("3", "1", 1)))
+//    genArray.[0].Post(bill)
+//    let bill = (TDMess(TopDownMessage("4", "1", 1)))
+//    genArray.[0].Post(bill)
+//
+//    genArray.[0].Post(SMess(StepMessage(1, genArray)))
+//
+//    let bill = (TDMess(TopDownMessage("1", "111", 2)))
+//   // let ben = 
+//    
+//    genArray.[0].Post(bill)
+//    let bill = (TDMess(TopDownMessage("2", "111", 2)))
+//    genArray.[0].Post(bill)
+//    let bill = (TDMess(TopDownMessage("3", "111", 2)))
+//    genArray.[0].Post(bill)
+//    let bill = (TDMess(TopDownMessage("4", "111", 2)))
+//    genArray.[0].Post(bill)
+
+//    genArray.[0].Post(SMess(StepMessage(1, genArray)))
 
     (*for i = 1 to numNodes do
         let bill = (TDMess(TopDownMessage(i.ToString(), "1", 1)))
@@ -218,7 +243,7 @@ let main argv =
         genArray.[0].Post(bill)*)
 
     //System.Threading.Thread.Sleep(5000)
-    tcs.Task.Wait()
+    //tcs.Task.Wait()
 
     //let mbg = new MailboxProcessor<TopDownMessage>(mailboxGeneral)
     (*let general = new MailboxProcessor<TopDownMessage>(fun inbox ->
