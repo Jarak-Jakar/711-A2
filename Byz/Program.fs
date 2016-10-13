@@ -49,17 +49,20 @@ type TopDownMessage(generalID, message : string, roundNumber) =
 type BottomUpMessage = 
     val id : int
 
-type StepMessage(nextRound) = 
+type StepMessage(nextRound, genArray : General[]) = 
     
-    member x.roundNumber = 
+    member x.RoundNumber = 
         nextRound
 
-type Message =
+    member x.GenArray =
+        genArray
+
+and  Message =
     | TDMess of TopDownMessage
     | SMess of StepMessage
     | BUMess of BottomUpMessage
 
-type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) = 
+and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) = 
     let messages = 
         match someMessages with
         (*| Some (x : String[]) -> Array2D.init (x.Length / numGenerals) numGenerals (fun y z -> x.[numGenerals * y + z])
@@ -70,7 +73,7 @@ type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
     //let lambda = TopDownMessage("lambda", initVal, numGenerals)
 
     //let genArray = Array2D.init numRounds numGenerals (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - x)) (initVal)))
-    let genArray = Array.init numRounds (fun x -> (Array.create (factorial numGenerals / factorial (numGenerals - x - 1)) (initVal)))
+    let messagesArray = Array.init numRounds (fun x -> (Array.create (factorial numGenerals / factorial (numGenerals - x - 1)) (initVal)))
 
     //let bigArray = Array2D.init numRounds numGenerals (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - x)) 0))
 
@@ -112,16 +115,22 @@ type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
                                 let x = mesg.Message.[i]
                                 if x = '0' || x = '1' then
                                     //genArray.[rn,i].[sender] <- mesg.Message.[i].ToString()
-                                    genArray.[rn].[index] <- mesg.Message.[i].ToString()
+                                    messagesArray.[rn].[index] <- mesg.Message.[i].ToString()
                                 else
-                                    genArray.[rn].[index] <- v0
+                                    messagesArray.[rn].[index] <- v0
 
-                            printfn "genArray = %A" genArray
+                            //printfn "genArray = %A" messagesArray
                             //printfn "hi bill"
                             if count >= 7 then
                                 tcs.SetResult(true)
                             //System.Threading.Thread.Sleep(5000)
                                 //genArray.[rn,i].[sender] <- Int32.Parse mesg.Message[i]
+                        | SMess mesg ->
+                            if mesg.RoundNumber = 1 then
+                                //mesg.GenArray.[0].Post(TDMess(TopDownMessage(id, v0, 1)))
+                                Array.iter (fun x -> x.Post(TDMess(TopDownMessage(id, v0, 1)))) mesg.GenArray
+                            else
+                                Array.iter (fun x -> x.Post(TDMess(TopDownMessage(id, "0", mesg.RoundNumber)))) mesg.GenArray
                         | _ -> printfn "Matched something other than a TopDownMessage"
                         return! loop (count + 1)}
             loop 0)
