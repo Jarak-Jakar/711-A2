@@ -81,10 +81,10 @@ type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
             let a = ((i * genless) / messageSize)
             if a < sender then
                 let b = a * messageSize
-                b + (compindex (roundNumber - 1) (numGenerals - 1) (sender - 1) messageSize i (genless - 1))
+                b + (compindex (roundNumber - 1) (numGenerals - 1) (sender - 1) (messageSize / numGenerals) (i - (a * (numGenerals - 1))) (genless - 1))
             else
                 let b = (a + 1) * messageSize
-                b + (compindex (roundNumber - 1) (numGenerals - 1) sender (messageSize / numGenerals) i (genless - 1))
+                b + (compindex (roundNumber - 1) (numGenerals - 1) sender (messageSize / numGenerals) (i - (a * (numGenerals - 1))) (genless - 1))
 
     let mb = 
         MailboxProcessor.Start (fun inbox ->
@@ -118,7 +118,7 @@ type General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
 
                             printfn "genArray = %A" genArray
                             //printfn "hi bill"
-                            if count >= 21 then
+                            if count >= 7 then
                                 tcs.SetResult(true)
                             //System.Threading.Thread.Sleep(5000)
                                 //genArray.[rn,i].[sender] <- Int32.Parse mesg.Message[i]
@@ -148,41 +148,41 @@ let main argv =
     let reader = File.OpenText(argv.[0])
     let mutable fileLine = reader.ReadLine()
     let mutable linePieces = fileLine.Split()
-    //let numNodes = Int32.Parse linePieces.[0]
-    let numNodes = 7
+    let numNodes = Int32.Parse linePieces.[0]
+    //let numNodes = 7
     let v0 = linePieces.[1]
     let genArray = Array.create numNodes (General("8", v0, "9", "1", 4, 2))
     let numRounds = int (Math.Floor((float (numNodes - 1)) / 3.0)) + 1
     for i = 0 to numNodes - 1 do
-        //fileLine <- reader.ReadLine()
-        //linePieces <- fileLine.Split()
-        (*if linePieces.[2] = "1" then
+        fileLine <- reader.ReadLine()
+        linePieces <- fileLine.Split()
+        if linePieces.[2] = "1" then
             genArray.[i] <- General(linePieces.[0], v0, linePieces.[1], linePieces.[2], numNodes, numRounds, linePieces.[3..])
         else
-            genArray.[i] <- General(linePieces.[0], v0, linePieces.[1], linePieces.[2], numNodes, numRounds)*)
-        genArray.[i] <- General(i.ToString(), v0, "0", "0", numNodes, numRounds)
+            genArray.[i] <- General(linePieces.[0], v0, linePieces.[1], linePieces.[2], numNodes, numRounds)
+        //genArray.[i] <- General(i.ToString(), v0, "0", "0", numNodes, numRounds)
 
     Array.sortInPlaceBy (fun (x : General) -> x.ID) genArray
 
-//    let bill = (TDMess(TopDownMessage("1", "1", 1)))
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("2", "1", 1)))
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("3", "1", 1)))
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("4", "1", 1)))
-//    genArray.[0].Post(bill)
-//
-//    let bill = (TDMess(TopDownMessage("1", "111", 2)))
-//   // let ben = 
-//    
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("2", "111", 2)))
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("3", "111", 2)))
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("4", "111", 2)))
-//    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("1", "1", 1)))
+    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("2", "1", 1)))
+    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("3", "1", 1)))
+    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("4", "1", 1)))
+    genArray.[0].Post(bill)
+
+    let bill = (TDMess(TopDownMessage("1", "111", 2)))
+   // let ben = 
+    
+    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("2", "111", 2)))
+    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("3", "111", 2)))
+    genArray.[0].Post(bill)
+    let bill = (TDMess(TopDownMessage("4", "111", 2)))
+    genArray.[0].Post(bill)
 
     (*for i = 1 to numNodes do
         let bill = (TDMess(TopDownMessage(i.ToString(), "1", 1)))
@@ -202,11 +202,11 @@ let main argv =
 
     for i = 1 to numNodes do
         let bill = (TDMess(TopDownMessage(i.ToString(), "111111", 2)))
-        genArray.[0].Post(bill)*)
+        genArray.[0].Post(bill)
 
     for i = 1 to numNodes do
         let bill = (TDMess(TopDownMessage(i.ToString(), "111111111111111111111111111111", 3)))
-        genArray.[0].Post(bill)
+        genArray.[0].Post(bill)*)
 
     //System.Threading.Thread.Sleep(5000)
     tcs.Task.Wait()
