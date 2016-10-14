@@ -48,8 +48,10 @@ type TopDownMessage(generalID, message : string, roundNumber) =
     member x.RoundNumber = 
         roundNumber
 
-type BottomUpMessage = 
-    val id : int
+type BottomUpMessage(nextRound : int) = 
+    
+    member x.RoundNumber = 
+        nextRound
 
 type StepMessage(nextRound, genArray : General[]) = 
     
@@ -64,7 +66,7 @@ and  Message =
     | SMess of StepMessage
     | BUMess of BottomUpMessage
 
-and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) = 
+and  General(Id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) = 
     let messages = 
         match someMessages with
         | Some (x : String[]) -> Array.init numRounds (fun y -> String.concat " " x.[(y * numGenerals)..(y * numGenerals + numGenerals - 1)])
@@ -97,14 +99,12 @@ and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
             let a = (i / (numGenerals - roundNumber))
             if a < sender then
                 let b = a * messageSize
-                let c = b + (compindex2 (roundNumber - 1) numGenerals (sender - 1) (messageSize / numGenerals) (i - (a * (genless - 1))) (genless - 1))
+                b + (compindex2 (roundNumber - 1) numGenerals (sender - 1) (messageSize / numGenerals) (i - (a * (genless - 1))) (genless - 1))
                 //Console.WriteLine("General: {0}, Round: {1}, i: {2}, c: {3}", id, roundNumber, i, c)
-                c
             else
                 let b = (a + 1) * messageSize
-                let c = b + (compindex2 (roundNumber - 1) numGenerals sender (messageSize / numGenerals) (i - (a * (genless - 1))) (genless - 1))
+                b + (compindex2 (roundNumber - 1) numGenerals sender (messageSize / numGenerals) (i - (a * (genless - 1))) (genless - 1))
                 //Console.WriteLine("General: {0}, Round: {1}, i: {2}, c: {3}", id, roundNumber, i, c)
-                c
 
     let mb = 
         MailboxProcessor.Start (fun inbox ->
@@ -118,7 +118,7 @@ and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
                             let msgSize = (factorial numGenerals) / (numGenerals * (factorial (numGenerals - rn - 1)))
                             let mutable index = 0
                             //let messagePieces = mesg.Message.Split
-                            Console.WriteLine("General {0} received message from {1} for round {2}.  Message is: {3}", id, mesg.ID, mesg.RoundNumber, mesg.Message)
+                            Console.WriteLine("General {0} received message from {1} for round {2}.  Message is: {3}", Id, mesg.ID, mesg.RoundNumber, mesg.Message)
                             for i = 0 to mesg.Message.Length - 1 do
                                 //let mutable index = 0
                                 (*if (i / (numGenerals - rn)) < sender then
@@ -152,26 +152,40 @@ and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
                                 if mesg.RoundNumber > 1 then
                                     let messageSize = (factorial numGenerals) / (numGenerals * (factorial (numGenerals - mesg.RoundNumber)))
                                     //let p = compindex2 mesg.RoundNumber (numGenerals - 1) ((Int32.Parse id) - 1) messageSize i (numGenerals - 1)
-                                    let blah = Array.init messageSize (fun i -> messagesArray.[mesg.RoundNumber - 2].[compindex2 (mesg.RoundNumber - 1) numGenerals ((Int32.Parse id) - 1) (messageSize / (numGenerals - mesg.RoundNumber)) i (numGenerals - 1)])
-                                    sendMessage <- String.concat "" blah
+                                    //let blah = Array.init messageSize (fun i -> messagesArray.[mesg.RoundNumber - 2].[compindex2 (mesg.RoundNumber - 1) numGenerals ((Int32.Parse id) - 1) (messageSize / (numGenerals - mesg.RoundNumber + 1)) i (numGenerals - 1)])
+                                    sendMessage <- String.concat "" (Array.init messageSize (fun i -> messagesArray.[mesg.RoundNumber - 2].[compindex2 (mesg.RoundNumber - 1) numGenerals ((Int32.Parse Id) - 1) (messageSize / (numGenerals - mesg.RoundNumber + 1)) i (numGenerals - 1)]))
 
                                 //if mesg.RoundNumber = 1 then
-                                Array.iter (fun (x : General) -> x.Post(TDMess(TopDownMessage(id, sendMessage, mesg.RoundNumber)))) mesg.GenArray
+                                Array.iter (fun (x : General) -> x.Post(TDMess(TopDownMessage(Id, sendMessage, mesg.RoundNumber)))) mesg.GenArray
                                 //else
                                     //Array.iter (fun (x : General) -> x.Post(TDMess(TopDownMessage(id, "0", mesg.RoundNumber)))) mesg.GenArray
 
-                                Console.WriteLine("{0} {1} > {2}", mesg.RoundNumber, id, (String.concat " " (Array.create numGenerals sendMessage)))
+                                Console.WriteLine("{0} {1} > {2}", mesg.RoundNumber, Id, (String.concat " " (Array.create numGenerals sendMessage)))
 
                             else
                                 let sendMessage = messages.[mesg.RoundNumber - 1].Split ' '
-                                Array.iteri (fun i (x : General) -> x.Post(TDMess(TopDownMessage(id, sendMessage.[i], mesg.RoundNumber)))) mesg.GenArray
+                                Array.iteri (fun i (x : General) -> x.Post(TDMess(TopDownMessage(Id, sendMessage.[i], mesg.RoundNumber)))) mesg.GenArray
                                 
-                                Console.WriteLine("{0} {1} > {2}", mesg.RoundNumber, id, messages.[mesg.RoundNumber - 1])
+                                Console.WriteLine("{0} {1} > {2}", mesg.RoundNumber, Id, messages.[mesg.RoundNumber - 1])
 
                             //tcs.SetResult(true)
 
                             return! loop 0
-                        | _ -> printfn "Matched something other than a TopDownMessage"
+                        | BUMess mesg -> 
+                            let mutable rn = mesg.RoundNumber - 1
+                            for i = (numRounds - 1) downto 0 do
+                                let msgSize = (factorial numGenerals) / (numGenerals * (factorial (numGenerals - rn + 1)))
+                                rn <- rn - 1
+                            
+                            
+                            
+                            //let tup = Array.countBy (id) messagesArray.[messagesArray.Length - 1]
+                            //printfn "General %A, tup = %A" Id tup
+                            //Console.WriteLine("General: {0}, tup: {1}", Id, tup)
+                            //Console.WriteLine("Entered BUMess, General: {0}, round number: {1}", id, mesg.RoundNumber)
+                            Console.WriteLine("{0} {1} : {2}", mesg.RoundNumber, Id, "111")
+                            bar.SignalAndWait()
+                        //| _ -> printfn "Matched something other than a proper message"
                         return! loop (count + 1)}
             loop 0)
 
@@ -181,7 +195,7 @@ and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
         isFaulty = "1"
 
     member x.ID = 
-        id
+        Id
 
 (*let mailboxGeneral (inbox : MailboxProcessor<TopDownMessage>, thisGeneral : General) = 
     //let general = thisGeneral
@@ -209,7 +223,7 @@ let main argv =
             genArray.[i] <- General(linePieces.[0], v0, linePieces.[1], linePieces.[2], numNodes, numRounds, linePieces.[3..])
         else
             genArray.[i] <- General(linePieces.[0], v0, linePieces.[1], linePieces.[2], numNodes, numRounds)
-        //genArray.[i] <- General(i.ToString(), v0, "0", "0", numNodes, numRounds)
+
         bar.AddParticipant() |> ignore
 
     Array.sortInPlaceBy (fun (x : General) -> x.ID) genArray
@@ -218,65 +232,7 @@ let main argv =
         Array.iter (fun (x : General) -> x.Post(SMess(StepMessage(i, genArray)))) genArray
         bar.SignalAndWait()
 
-    //let bill = (TDMess(TopDownMessage("1", "1", 1)))
-    //genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("2", "1", 1)))
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("3", "1", 1)))
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("4", "1", 1)))
-//    genArray.[0].Post(bill)
-//
-//    genArray.[0].Post(SMess(StepMessage(1, genArray)))
-//
-//    let bill = (TDMess(TopDownMessage("1", "111", 2)))
-//   // let ben = 
-//    
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("2", "111", 2)))
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("3", "111", 2)))
-//    genArray.[0].Post(bill)
-//    let bill = (TDMess(TopDownMessage("4", "111", 2)))
-//    genArray.[0].Post(bill)
-
-//    genArray.[0].Post(SMess(StepMessage(1, genArray)))
-
-    (*for i = 1 to numNodes do
-        let bill = (TDMess(TopDownMessage(i.ToString(), "1", 1)))
-        genArray.[0].Post(bill)
-
-    for i = 1 to numNodes do
-        let bill = (TDMess(TopDownMessage(i.ToString(), "111", 2)))
-        genArray.[0].Post(bill)
-
-    for i = 1 to numNodes do
-        let bill = (TDMess(TopDownMessage(i.ToString(), "111111111111", 3)))
-        genArray.[0].Post(bill)*)
-
-    (*for i = 1 to numNodes do
-        let bill = (TDMess(TopDownMessage(i.ToString(), "1", 1)))
-        genArray.[0].Post(bill)
-
-    for i = 1 to numNodes do
-        let bill = (TDMess(TopDownMessage(i.ToString(), "111111", 2)))
-        genArray.[0].Post(bill)
-
-    for i = 1 to numNodes do
-        let bill = (TDMess(TopDownMessage(i.ToString(), "111111111111111111111111111111", 3)))
-        genArray.[0].Post(bill)*)
-
-    //System.Threading.Thread.Sleep(5000)
-    //tcs.Task.Wait()
-
-    //let mbg = new MailboxProcessor<TopDownMessage>(mailboxGeneral)
-    (*let general = new MailboxProcessor<TopDownMessage>(fun inbox ->
-        let rec loop count =
-            async { let! msg = inbox.Receive()
-                    printfn "Message is %A" msg.ID
-                    return! loop(count + 1)}
-        loop 0)*)
-
-
+    Array.iter (fun (x: General) -> x.Post(BUMess(BottomUpMessage(numRounds + 1)))) genArray
+    bar.SignalAndWait()
 
     0 // return an integer exit code
