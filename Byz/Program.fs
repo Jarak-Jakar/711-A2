@@ -73,6 +73,7 @@ and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
     //let genArray = Array2D.init numRounds numGenerals (fun x y -> (Array.create (factorial numGenerals / factorial (numGenerals - x)) (initVal)))
     let messagesArray = Array.init numRounds (fun x -> (Array.create (factorial numGenerals / factorial (numGenerals - x - 1)) (initVal)))
 
+    // Used when placing parts of incoming messages into the array
     let rec compindex roundNumber numGenerals sender messageSize i genless  = 
         if roundNumber = 0 then
             sender
@@ -84,6 +85,26 @@ and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
             else
                 let b = (a + 1) * messageSize
                 b + (compindex (roundNumber - 1) (numGenerals - 1) sender (messageSize / numGenerals) (i - (a * (numGenerals - 1))) (genless - 1))
+
+    // Used to determine where each part of an outgoing message should be selected from
+    let rec compindex2 roundNumber numGenerals sender messageSize i genless  = 
+        if roundNumber = 1 then
+            if i < sender then
+                i
+            else
+                i + 1
+        else 
+            let a = (i / (numGenerals - roundNumber))
+            if a < sender then
+                let b = a * messageSize
+                let c = b + (compindex2 (roundNumber - 1) numGenerals (sender - 1) (messageSize / numGenerals) (i - (a * (genless - 1))) (genless - 1))
+                //Console.WriteLine("General: {0}, Round: {1}, i: {2}, c: {3}", id, roundNumber, i, c)
+                c
+            else
+                let b = (a + 1) * messageSize
+                let c = b + (compindex2 (roundNumber - 1) numGenerals sender (messageSize / numGenerals) (i - (a * (genless - 1))) (genless - 1))
+                //Console.WriteLine("General: {0}, Round: {1}, i: {2}, c: {3}", id, roundNumber, i, c)
+                c
 
     let mb = 
         MailboxProcessor.Start (fun inbox ->
@@ -129,7 +150,10 @@ and  General(id, v0, initVal, isFaulty, numGenerals, numRounds, ?someMessages) =
 
                                 // Work out sendMessage here
                                 if mesg.RoundNumber > 1 then
-                                    sendMessage <- "111"
+                                    let messageSize = (factorial numGenerals) / (numGenerals * (factorial (numGenerals - mesg.RoundNumber)))
+                                    //let p = compindex2 mesg.RoundNumber (numGenerals - 1) ((Int32.Parse id) - 1) messageSize i (numGenerals - 1)
+                                    let blah = Array.init messageSize (fun i -> messagesArray.[mesg.RoundNumber - 2].[compindex2 (mesg.RoundNumber - 1) numGenerals ((Int32.Parse id) - 1) (messageSize / (numGenerals - mesg.RoundNumber)) i (numGenerals - 1)])
+                                    sendMessage <- String.concat "" blah
 
                                 //if mesg.RoundNumber = 1 then
                                 Array.iter (fun (x : General) -> x.Post(TDMess(TopDownMessage(id, sendMessage, mesg.RoundNumber)))) mesg.GenArray
